@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Let's Be Clear</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's Be Clear – Ingredient Checker</title>
 
-  <!-- Supabase JS (v2) -->
+  <!-- Supabase JS library via unpkg -->
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/supabase.min.js"></script>
-
 
   <style>
     body {
@@ -27,69 +27,83 @@
       border: 1px solid #ccc;
       padding: 10px;
       max-width: 600px;
+      white-space: pre-line;
     }
   </style>
 </head>
 <body>
 
   <h1>Let's Be Clear</h1>
-<p>Paste a skincare ingredient list below:</p>
+  <p>Paste a skincare ingredient list below:</p>
 
-<textarea id="ingredientInput" rows="6" placeholder="Example: Water, Isopropyl Myristate, Glycerin, Niacinamide"></textarea>
-<br>
-<button id="analyzeBtn">Analyze Ingredients</button>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    // =========================
-    // REPLACE THESE WITH YOUR OWN SUPABASE INFO
-    // =========================
-    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+  <textarea id="ingredientInput" rows="6" placeholder="Example: Water, Isopropyl Myristate, Glycerin, Niacinamide"></textarea>
+  <br>
+  <button id="analyzeBtn">Analyze Ingredients</button>
 
-    // Create Supabase client
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <div id="results"></div>
 
-    // Normalize ingredient names
-    function normalize(text) {
-      return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-    }
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
 
-    // Add click listener AFTER DOM is ready
-    const analyzeBtn = document.getElementById("analyzeBtn");
-    analyzeBtn.addEventListener("click", async () => {
-      const input = document.getElementById("ingredientInput").value;
+      // -------------------------
+      // REPLACE THESE WITH YOUR SUPABASE INFO
+      // -------------------------
+      const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-      if (!input) {
-        alert("Please paste an ingredient list.");
-        return;
+      // Initialize Supabase client
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // Helper: normalize ingredient names
+      function normalize(text) {
+        if (!text) return "";
+        return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
       }
 
-      const userIngredients = input.split(",").map(i => normalize(i));
+      // Click listener for Analyze button
+      const analyzeBtn = document.getElementById("analyzeBtn");
+      analyzeBtn.addEventListener("click", async () => {
 
-      const { data: dbIngredients, error } = await client
-        .from("ingredients")
-        .select("*");
+        const input = document.getElementById("ingredientInput").value;
+        if (!input) {
+          alert("Please paste an ingredient list.");
+          return;
+        }
 
-      if (error) {
-        alert("Supabase error: " + error.message);
-        console.error(error);
-        return;
-      }
+        const userIngredients = input.split(",").map(i => normalize(i));
 
-      const results = dbIngredients.filter(dbIng =>
-      dbIng.name && userIngredients.includes(normalize(dbIng.name))
-      );
+        try {
+          const { data: dbIngredients, error } = await client
+            .from("ingredients")
+            .select("*");
 
+          if (error) {
+            alert("Supabase error: " + error.message);
+            console.error(error);
+            return;
+          }
 
-      const output = results.length
-        ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("<br>")
-        : "No matching ingredients found.";
+          const results = dbIngredients.filter(dbIng =>
+            dbIng.name && userIngredients.includes(normalize(dbIng.name))
+          );
 
-      document.getElementById("results").innerHTML = output;
+          const output = results.length
+            ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("\n")
+            : "No matching ingredients found.";
+
+          document.getElementById("results").innerText = output;
+
+        } catch (err) {
+          alert("Unexpected error: " + err.message);
+          console.error(err);
+        }
+      });
+
     });
-  });
-</script>
+  </script>
 
+</body>
+</html>
 
 </body>
 </html>
