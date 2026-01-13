@@ -1,97 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Let's Be Clear – Ingredient Checker</title>
+  <meta charset="UTF-8" />
+  <title>Supabase Connection Test</title>
 
-  <!-- Supabase JS library via unpkg -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/supabase.min.js"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-    }
-    textarea {
-      width: 100%;
-      max-width: 600px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      font-size: 16px;
-    }
-    #results {
-      margin-top: 20px;
-      border: 1px solid #ccc;
-      padding: 10px;
-      max-width: 600px;
-      white-space: pre-line;
-    }
-  </style>
+  <!-- Supabase v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <h1>Let's Be Clear</h1>
-  <p>Paste a skincare ingredient list below:</p>
+  <h1>Supabase Test</h1>
 
-  <textarea id="ingredientInput" rows="6" placeholder="Example: Water, Isopropyl Myristate, Glycerin, Niacinamide"></textarea>
-  <br>
-  <button id="analyzeBtn">Analyze Ingredients</button>
+  <button id="testBtn">Test Supabase Connection</button>
 
-  <div id="results"></div>
+  <pre id="output">Waiting…</pre>
 
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
 
-    if (typeof Supabase === "undefined") {
-      alert("Supabase library failed to load");
-      throw new Error("Supabase is not defined");
-    }
-
-    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
-
-    const client = Supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
-
-    function normalize(text) {
-      if (!text) return "";
-      return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-    }
-
-    document.getElementById("analyzeBtn").addEventListener("click", async () => {
-      const input = document.getElementById("ingredientInput").value;
-      if (!input) return alert("Paste ingredients first.");
-
-      const userIngredients = input.split(",").map(i => normalize(i));
-
-      const { data, error } = await client
-        .from("ingredients")
-        .select("*");
-
-      if (error) {
-        console.error(error);
-        alert(error.message);
+      // 🔴 STEP A: VERIFY LIBRARY LOADED
+      if (typeof Supabase === "undefined") {
+        document.getElementById("output").textContent =
+          "Supabase library did NOT load.";
         return;
       }
 
-      const matches = data.filter(i =>
-        i.name && userIngredients.includes(normalize(i.name))
+      // 🔴 STEP B: INSERT YOUR REAL CREDENTIALS
+      const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+
+      const client = Supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
       );
 
-      document.getElementById("results").innerText =
-        matches.length
-          ? matches.map(i => `• ${i.name}`).join("\n")
-          : "No matching ingredients found.";
+      document.getElementById("testBtn").addEventListener("click", async () => {
+        document.getElementById("output").textContent = "Connecting…";
+
+        const { data, error } = await client
+          .from("ingredients")
+          .select("*")
+          .limit(5);
+
+        if (error) {
+          document.getElementById("output").textContent =
+            "ERROR:\n" + JSON.stringify(error, null, 2);
+          return;
+        }
+
+        document.getElementById("output").textContent =
+          "Connected.\nLoaded rows:\n" +
+          JSON.stringify(data, null, 2);
+      });
+
     });
-
-  });
-</script>
-
+  </script>
 
 </body>
 </html>
