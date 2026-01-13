@@ -2,70 +2,117 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Supabase Connection Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's Be Clear — Ingredient Checker</title>
 
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+    textarea {
+      width: 100%;
+      max-width: 600px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 16px;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      max-width: 600px;
+      white-space: pre-wrap;
+    }
+  </style>
 </head>
 <body>
 
-  <h1>Let’s Be Clear — Ingredient Checker</h1>
+  <h1>Let's Be Clear — Ingredient Checker</h1>
 
-  <textarea id="input" rows="6" style="width:100%;max-width:600px;"
-    placeholder="Paste ingredient list here (comma separated)"></textarea>
-
-  <br><br>
-
+  <p>Paste a skincare ingredient list below (comma separated):</p>
+  <textarea id="input" rows="6" placeholder="e.g., Water, Glycerin, Dimethicone, Lanolin"></textarea>
+  <br>
   <button id="analyzeBtn">Analyze Ingredients</button>
 
-  <pre id="output">Waiting…</pre>
+  <div id="output">Waiting…</div>
 
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
 
+      // -----------------------------
+      // REPLACE WITH YOUR SUPABASE INFO
+      // -----------------------------
       const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-      const client = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      );
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       document.getElementById("analyzeBtn").addEventListener("click", async () => {
         const raw = document.getElementById("input").value;
-
         if (!raw.trim()) {
-          document.getElementById("output").textContent =
-            "Please paste an ingredient list.";
+          document.getElementById("output").textContent = "Please paste an ingredient list.";
           return;
         }
 
+        // Split user input into individual ingredients
         const inputIngredients = raw
           .split(",")
           .map(i => i.trim().toLowerCase());
 
+        // Fetch all ingredients from Supabase
         const { data, error } = await client
           .from("ingredients")
           .select("*");
 
         if (error) {
-          document.getElementById("output").textContent =
-            "ERROR:\n" + JSON.stringify(error, null, 2);
+          document.getElementById("output").textContent = "ERROR:\n" + JSON.stringify(error, null, 2);
           return;
         }
 
-        const matches = data.filter(row =>
-          inputIngredients.includes(row.inci_name.toLowerCase())
-        );
+        // Match input against main names + synonyms
+        const matches = data.filter(row => {
+          const rowName = row.inci_name.toLowerCase();
 
-        document.getElementById("output").textContent =
-          "Matched ingredients:\n" +
-          JSON.stringify(matches, null, 2);
+          // parse synonyms JSON
+          let syns = [];
+          if (row.synonyms) {
+            try {
+              syns = JSON.parse(row.synonyms).map(s => s.toLowerCase());
+            } catch (e) {
+              console.warn("Invalid JSON in synonyms for", row.inci_name);
+            }
+          }
+
+          // Match if input ingredient equals main name or any synonym
+          return inputIngredients.some(input => input === rowName || syns.includes(input));
+        });
+
+        // Display results in human-readable format
+        if (matches.length === 0) {
+          document.getElementById("output").textContent = "No known ingredients found.";
+          return;
+        }
+
+        let resultText = "Ingredient Analysis:\n\n";
+        matches.forEach(ing => {
+          resultText += `• ${ing.inci_name}\n`;
+          resultText += `  Category: ${ing.category || "—"}\n`;
+          resultText += `  Pore clogging risk: ${ing.auto_flag ? "⚠️ Yes" : "No"}\n`;
+          resultText += `  Notes: ${ing.explanation_short || "—"}\n\n`;
+        });
+
+        document.getElementById("output").textContent = resultText;
+
       });
 
     });
   </script>
 
 </body>
-
 </html>
