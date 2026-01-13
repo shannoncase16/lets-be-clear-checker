@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Supabase Connection Test</title>
 
-  <!-- Supabase v2 CDN -->
+  <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -18,18 +18,19 @@
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
 
-      // 🔴 STEP A: VERIFY LIBRARY LOADED
-      if (typeof Supabase === "undefined") {
+      // ✅ CORRECT GLOBAL CHECK FOR SUPABASE V2
+      if (!window.supabase) {
         document.getElementById("output").textContent =
           "Supabase library did NOT load.";
         return;
       }
 
-      // 🔴 STEP B: INSERT YOUR REAL CREDENTIALS
+      // 🔴 PASTE YOUR REAL VALUES BELOW
       const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-      const client = Supabase.createClient(
+      // ✅ CORRECT CLIENT CREATION
+      const client = window.supabase.createClient(
         SUPABASE_URL,
         SUPABASE_ANON_KEY
       );
