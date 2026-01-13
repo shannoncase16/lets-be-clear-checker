@@ -42,65 +42,56 @@
 
   <div id="results"></div>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
 
-      // -------------------------
-      // REPLACE THESE WITH YOUR SUPABASE INFO
-      // -------------------------
-      const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    if (typeof Supabase === "undefined") {
+      alert("Supabase library failed to load");
+      throw new Error("Supabase is not defined");
+    }
 
-      // Initialize Supabase client
-      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-      // Helper: normalize ingredient names
-      function normalize(text) {
-        if (!text) return "";
-        return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    const client = Supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+    function normalize(text) {
+      if (!text) return "";
+      return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    }
+
+    document.getElementById("analyzeBtn").addEventListener("click", async () => {
+      const input = document.getElementById("ingredientInput").value;
+      if (!input) return alert("Paste ingredients first.");
+
+      const userIngredients = input.split(",").map(i => normalize(i));
+
+      const { data, error } = await client
+        .from("ingredients")
+        .select("*");
+
+      if (error) {
+        console.error(error);
+        alert(error.message);
+        return;
       }
 
-      // Click listener for Analyze button
-      const analyzeBtn = document.getElementById("analyzeBtn");
-      analyzeBtn.addEventListener("click", async () => {
+      const matches = data.filter(i =>
+        i.name && userIngredients.includes(normalize(i.name))
+      );
 
-        const input = document.getElementById("ingredientInput").value;
-        if (!input) {
-          alert("Please paste an ingredient list.");
-          return;
-        }
-
-        const userIngredients = input.split(",").map(i => normalize(i));
-
-        try {
-          const { data: dbIngredients, error } = await client
-            .from("ingredients")
-            .select("*");
-
-          if (error) {
-            alert("Supabase error: " + error.message);
-            console.error(error);
-            return;
-          }
-
-          const results = dbIngredients.filter(dbIng =>
-            dbIng.name && userIngredients.includes(normalize(dbIng.name))
-          );
-
-          const output = results.length
-            ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("\n")
-            : "No matching ingredients found.";
-
-          document.getElementById("results").innerText = output;
-
-        } catch (err) {
-          alert("Unexpected error: " + err.message);
-          console.error(err);
-        }
-      });
-
+      document.getElementById("results").innerText =
+        matches.length
+          ? matches.map(i => `• ${i.name}`).join("\n")
+          : "No matching ingredients found.";
     });
-  </script>
+
+  });
+</script>
+
 
 </body>
 </html>
