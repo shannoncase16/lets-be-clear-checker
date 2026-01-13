@@ -32,45 +32,64 @@
 <body>
 
   <h1>Let's Be Clear</h1>
-  <p>Testing Supabase connection.</p>
+<p>Paste a skincare ingredient list below:</p>
 
-  <button id="testSupabase">Test Supabase Connection</button>
+<textarea id="ingredientInput" rows="6" placeholder="Example: Water, Isopropyl Myristate, Glycerin, Niacinamide"></textarea>
+<br>
+<button id="analyzeBtn">Analyze Ingredients</button>
+<script>
+  const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-  <div id="results"></div>
+  const client = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
 
-  <script>
-    // ---------------------------
-    // SUPABASE CONFIG
-    // ---------------------------
-    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+  // Normalize ingredient names
+  function normalize(text) {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .trim();
+  }
 
-    // Create client ONCE
-    const client = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+  document.getElementById("analyzeBtn").addEventListener("click", async () => {
+    const input = document.getElementById("ingredientInput").value;
 
-    document.getElementById("testSupabase").addEventListener("click", async () => {
-      document.getElementById("results").innerHTML = "Connecting...";
+    if (!input) {
+      alert("Please paste an ingredient list.");
+      return;
+    }
 
-      const { data, error } = await client
-        .from("ingredients")
-        .select("*")
-        .limit(5);
+    const userIngredients = input
+      .split(",")
+      .map(i => normalize(i));
 
-      if (error) {
-        document.getElementById("results").innerHTML =
-          "<strong>Error:</strong> " + error.message;
-        console.error(error);
-        return;
+    const { data: dbIngredients, error } = await client
+      .from("ingredients")
+      .select("*");
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    let results = [];
+
+    dbIngredients.forEach(dbIng => {
+      const dbName = normalize(dbIng.name);
+
+      if (userIngredients.includes(dbName)) {
+        results.push(dbIng);
       }
-
-      document.getElementById("results").innerHTML =
-        "<strong>Connected.</strong> Loaded " + data.length + " ingredients.";
-      console.log(data);
     });
-  </script>
 
-</body>
-</html>
+    const output = results.length
+      ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("<br>")
+      : "No matching ingredients found.";
+
+    document.getElementById("results").innerHTML = output;
+  });
+</script>
+
