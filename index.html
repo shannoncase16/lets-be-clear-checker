@@ -3,17 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <title>Let's Be Clear</title>
+
+  <!-- Supabase JS (v2) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+    textarea {
+      width: 100%;
+      max-width: 600px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 16px;
+    }
+    #results {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      max-width: 600px;
+    }
+  </style>
 </head>
 <body>
 
   <h1>Let's Be Clear</h1>
-  <p>If you see this, GitHub Pages is working.</p>
+  <p>Testing Supabase connection.</p>
 
-  <button id="testBtn">Test Button</button>
+  <button id="testSupabase">Test Supabase Connection</button>
+
+  <div id="results"></div>
 
   <script>
-    document.getElementById("testBtn").addEventListener("click", function () {
-      alert("JavaScript is working.");
+    // ---------------------------
+    // SUPABASE CONFIG
+    // ---------------------------
+    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+
+    // Create client ONCE
+    const client = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+    document.getElementById("testSupabase").addEventListener("click", async () => {
+      document.getElementById("results").innerHTML = "Connecting...";
+
+      const { data, error } = await client
+        .from("ingredients")
+        .select("*")
+        .limit(5);
+
+      if (error) {
+        document.getElementById("results").innerHTML =
+          "<strong>Error:</strong> " + error.message;
+        console.error(error);
+        return;
+      }
+
+      document.getElementById("results").innerHTML =
+        "<strong>Connected.</strong> Loaded " + data.length + " ingredients.";
+      console.log(data);
     });
   </script>
 
