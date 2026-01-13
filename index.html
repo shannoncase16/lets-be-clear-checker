@@ -9,39 +9,44 @@
 </head>
 <body>
 
-  <h1>Supabase Test</h1>
+  <h1>Let’s Be Clear — Ingredient Checker</h1>
 
-  <button id="testBtn">Test Supabase Connection</button>
+  <textarea id="input" rows="6" style="width:100%;max-width:600px;"
+    placeholder="Paste ingredient list here (comma separated)"></textarea>
+
+  <br><br>
+
+  <button id="analyzeBtn">Analyze Ingredients</button>
 
   <pre id="output">Waiting…</pre>
 
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
 
-      // ✅ CORRECT GLOBAL CHECK FOR SUPABASE V2
-      if (!window.supabase) {
-        document.getElementById("output").textContent =
-          "Supabase library did NOT load.";
-        return;
-      }
-
-      // 🔴 PASTE YOUR REAL VALUES BELOW
       const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
       const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-      // ✅ CORRECT CLIENT CREATION
       const client = window.supabase.createClient(
         SUPABASE_URL,
         SUPABASE_ANON_KEY
       );
 
-      document.getElementById("testBtn").addEventListener("click", async () => {
-        document.getElementById("output").textContent = "Connecting…";
+      document.getElementById("analyzeBtn").addEventListener("click", async () => {
+        const raw = document.getElementById("input").value;
+
+        if (!raw.trim()) {
+          document.getElementById("output").textContent =
+            "Please paste an ingredient list.";
+          return;
+        }
+
+        const inputIngredients = raw
+          .split(",")
+          .map(i => i.trim().toLowerCase());
 
         const { data, error } = await client
           .from("ingredients")
-          .select("*")
-          .limit(5);
+          .select("*");
 
         if (error) {
           document.getElementById("output").textContent =
@@ -49,13 +54,18 @@
           return;
         }
 
+        const matches = data.filter(row =>
+          inputIngredients.includes(row.inci_name.toLowerCase())
+        );
+
         document.getElementById("output").textContent =
-          "Connected.\nLoaded rows:\n" +
-          JSON.stringify(data, null, 2);
+          "Matched ingredients:\n" +
+          JSON.stringify(matches, null, 2);
       });
 
     });
   </script>
 
 </body>
+
 </html>
