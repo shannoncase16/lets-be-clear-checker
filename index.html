@@ -38,20 +38,17 @@
 <br>
 <button id="analyzeBtn">Analyze Ingredients</button>
 <script>
+  // ---------------------------
+  // SUPABASE CONFIG
+  // ---------------------------
   const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-  const client = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Normalize ingredient names
   function normalize(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .trim();
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
   }
 
   document.getElementById("analyzeBtn").addEventListener("click", async () => {
@@ -62,10 +59,10 @@
       return;
     }
 
-    const userIngredients = input
-      .split(",")
-      .map(i => normalize(i));
+    // Split user input into ingredients
+    const userIngredients = input.split(",").map(i => normalize(i));
 
+    // Fetch all ingredients from Supabase
     const { data: dbIngredients, error } = await client
       .from("ingredients")
       .select("*");
@@ -75,16 +72,12 @@
       return;
     }
 
-    let results = [];
+    // Match user ingredients with Supabase data
+    const results = dbIngredients.filter(dbIng =>
+      userIngredients.includes(normalize(dbIng.name))
+    );
 
-    dbIngredients.forEach(dbIng => {
-      const dbName = normalize(dbIng.name);
-
-      if (userIngredients.includes(dbName)) {
-        results.push(dbIng);
-      }
-    });
-
+    // Display results
     const output = results.length
       ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("<br>")
       : "No matching ingredients found.";
@@ -92,4 +85,5 @@
     document.getElementById("results").innerHTML = output;
   });
 </script>
+
 
