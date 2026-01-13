@@ -76,8 +76,9 @@
       }
 
       const results = dbIngredients.filter(dbIng =>
-        userIngredients.includes(normalize(dbIng.name))
+      dbIng.name && userIngredients.includes(normalize(dbIng.name))
       );
+
 
       const output = results.length
         ? results.map(i => `• ${i.name} (Score: ${i.base_score})`).join("<br>")
