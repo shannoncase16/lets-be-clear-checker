@@ -17,23 +17,91 @@
 <body>
 
 <h1>Let's Be Clear</h1>
-<p>Paste skincare ingredients below:</p>
+<p>Paste skincare ingredients below (comma separated):</p>
 
-<textarea id="ingredientInput" placeholder="Paste ingredients here..."></textarea>
+<textarea id="ingredientInput" placeholder="Oleic Acid, Glycerin, Dimethicone"></textarea>
 <br>
 <button id="checkButton">Analyze Ingredients</button>
 <div id="results"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  // Only initialize supabase if it doesn't already exist
-  if (typeof supabase === 'undefined') {
-    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
-    var supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  // ======= Supabase setup =======
+  if (typeof supabaseClient === 'undefined') {
+    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";        // replace this
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";   // replace this
+    var supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
   }
-</script>
 
+  // ======= Example test ingredients (for immediate results) =======
+  // This is only for testing without real database rows
+  const testIngredients = [
+    {
+      id: "1",
+      inci_name: "Oleic Acid",
+      common_name: "Oleic Acid",
+      synonyms: ["C18:1"],
+      base_score: 4,
+      auto_flag: true,
+      explanation_short: "Can clog pores"
+    },
+    {
+      id: "2",
+      inci_name: "Glycerin",
+      common_name: "Glycerin",
+      synonyms: null,
+      base_score: 0,
+      auto_flag: false,
+      explanation_short: "Hydrating, non-comedogenic"
+    },
+    {
+      id: "3",
+      inci_name: "Dimethicone",
+      common_name: "Dimethicone",
+      synonyms: null,
+      base_score: 1,
+      auto_flag: false,
+      explanation_short: "Silicone, non-comedogenic"
+    }
+  ];
+
+  document.getElementById("checkButton").addEventListener("click", async () => {
+    const input = document.getElementById("ingredientInput").value;
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = "";
+
+    if (!input.trim()) {
+      resultsDiv.innerHTML = "<p>Please paste ingredients first.</p>";
+      return;
+    }
+
+    const userIngredients = input.split(",").map(i => i.trim().toLowerCase()).filter(i => i);
+
+    // ======= Replace the next line with a real Supabase fetch if ready =======
+    // const { data: ingredients } = await supabaseClient.from("ingredients").select("*");
+    const ingredients = testIngredients;
+
+    // Match ingredients
+    const matchedIngredients = ingredients.filter(ing => {
+      const synonyms = ing.synonyms || [];
+      const allNames = [ing.inci_name.toLowerCase(), ing.common_name?.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
+      return userIngredients.some(u => allNames.includes(u));
+    });
+
+    if (matchedIngredients.length === 0) {
+      resultsDiv.innerHTML = "<p>No matching ingredients found.</p>";
+      return;
+    }
+
+    let totalScore = 0;
+    matchedIngredients.forEach(ing => {
+      const color = ing.auto_flag ? "red" : "green";
+      totalScore += ing.base_score || 0;
+      resultsDiv.innerHTML += `<p style="color:${color}"><strong>${ing.inci_name}</strong>: ${ing.explanation_short}</p>`;
+    });
+
+    resultsDiv.innerHTML += `<p><strong>Total comedogenic score:</strong> ${totalScore}</p>`;
+  });
+</script>
 
 </body>
 </html>
