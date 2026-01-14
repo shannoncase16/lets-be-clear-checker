@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Let's Be Clear – Ingredient Checker</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Let’s Be Clear</title>
 
-  <!-- Supabase JS (loaded once) -->
+  <!-- Load Supabase ONCE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -19,34 +19,29 @@
       height: 120px;
     }
     button {
-      margin-top: 10px;
+      margin-top: 12px;
       padding: 10px;
       font-size: 16px;
     }
     #results {
       margin-top: 20px;
-      padding: 10px;
       border: 1px solid #ccc;
+      padding: 12px;
     }
   </style>
 </head>
 
 <body>
+  <h1>Let’s Be Clear</h1>
+  <p>Paste an ingredient list (comma-separated)</p>
 
-  <h1>Let's Be Clear</h1>
-  <p>Paste an ingredient list (comma-separated).</p>
-
-  <textarea id="ingredientInput"
-    placeholder="Water, Glycerin, Dimethicone, Lanolin"></textarea>
-
-  <button id="analyzeBtn">Analyze Ingredients</button>
+  <textarea id="input" placeholder="Water, Glycerin, Lanolin"></textarea>
+  <button id="analyze">Analyze Ingredients</button>
 
   <div id="results"></div>
 
   <script>
-    // =============================
-    // SUPABASE CONFIG (ONLY ONCE)
-    // =============================
+    // Supabase config
     const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
@@ -55,20 +50,19 @@
       SUPABASE_KEY
     );
 
-    function normalize(str) {
-      return str.toLowerCase().trim();
+    function normalize(text) {
+      return text.toLowerCase().trim();
     }
 
-    document.getElementById("analyzeBtn").addEventListener("click", async () => {
-      const input = document.getElementById("ingredientInput").value;
-
-      if (!input) {
+    document.getElementById("analyze").addEventListener("click", async () => {
+      const raw = document.getElementById("input").value;
+      if (!raw) {
         document.getElementById("results").innerText =
           "Please enter ingredients.";
         return;
       }
 
-      const inputIngredients = input
+      const inputIngredients = raw
         .split(",")
         .map(i => normalize(i));
 
@@ -93,7 +87,6 @@
       }
 
       document.getElementById("results").innerHTML =
-        "<h3>Matched Ingredients</h3>" +
         matches.map(m => `
           <strong>${m.inci_name}</strong><br>
           Score: ${m.base_score}<br>
@@ -101,6 +94,5 @@
         `).join("");
     });
   </script>
-
 </body>
 </html>
