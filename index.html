@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Let's Be Clear – Ingredient Checker</title>
+  <title>Let’s Be Clear – Ingredient Checker</title>
 
-  <!-- Supabase CDN (loads global window.supabase) -->
+  <!-- Supabase CDN (loads window.supabase globally ONCE) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -27,6 +27,14 @@
       margin-top: 20px;
       border: 1px solid #ccc;
       padding: 12px;
+    }
+    .bad {
+      color: red;
+      font-weight: bold;
+    }
+    .good {
+      color: green;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -52,16 +60,17 @@
     const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-    // IMPORTANT:
-    // We DO NOT redeclare `supabase`
-    // We create our own client variable instead
+    // IMPORTANT: do NOT redeclare `supabase`
     const sb = window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_ANON_KEY
     );
 
     function normalize(text) {
-      return text.toLowerCase().trim();
+      return text
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     document
@@ -90,20 +99,20 @@
           return;
         }
 
-const matches = data.filter(row => {
-  const names = [
-    row.inci_name,
-    row.common_name,
-    ...(row.synonyms || [])
-  ]
-    .filter(Boolean)
-    .map(n => normalize(n));
+        // MATCHING WITH SYNONYMS
+        const matches = data.filter(row => {
+          const names = [
+            row.inci_name,
+            row.common_name,
+            ...(row.synonyms || [])
+          ]
+            .filter(Boolean)
+            .map(n => normalize(n));
 
-  return inputIngredients.some(input =>
-    names.includes(input)
-  );
-});
-
+          return inputIngredients.some(input =>
+            names.includes(input)
+          );
+        });
 
         if (matches.length === 0) {
           document.getElementById("results").innerText =
@@ -111,18 +120,25 @@ const matches = data.filter(row => {
           return;
         }
 
-document.getElementById("results").innerHTML =
-  "<h3>Matched Ingredients</h3>" +
-  matches.map(m => `
-    <div style="margin-bottom:12px;">
-      <strong style="color:${m.auto_flag ? "red" : "green"};">
-        ${m.inci_name}
-      </strong><br>
-      Score: ${m.base_score}<br>
-      ${m.explanation_short || ""}
-    </div>
-  `).join("");
+        // TOTAL SCORE
+        const totalScore = matches.reduce(
+          (sum, i) => sum + (i.base_score || 0),
+          0
+        );
 
+        // OUTPUT
+        document.getElementById("results").innerHTML =
+          `<strong>Total Comedogenic Score:</strong> ${totalScore}<br><br>` +
+          "<h3>Matched Ingredients</h3>" +
+          matches.map(m => `
+            <div style="margin-bottom:12px;">
+              <span class="${m.auto_flag ? "bad" : "good"}">
+                ${m.inci_name}
+              </span><br>
+              Score: ${m.base_score}<br>
+              ${m.explanation_short || ""}
+            </div>
+          `).join("");
       });
   </script>
 
