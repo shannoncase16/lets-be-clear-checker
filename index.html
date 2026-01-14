@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Let's Be Clear – Barcode Scanner</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
@@ -22,24 +20,33 @@
   <video id="camera" autoplay></video>
   <div id="results">No product scanned yet.</div>
 
-  <script>
-    // ===== Supabase setup =====
-    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
-    const supabase = Supabase.createClient(supabaseUrl, supabaseKey);
+  <!-- Supabase ES Module -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    window.supabase = createClient(
+      "https://hmfjdsbfkgehybmeosxw.supabase.co",     // <-- Replace with your Supabase URL
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0" // <-- Replace with your Supabase anon key
+    );
+  </script>
 
-    // ===== Barcode scanner setup =====
-    const codeReader = new ZXing.BrowserBarcodeReader();
+  <!-- ZXing Barcode Scanner ES Module -->
+  <script type="module">
+    import { BrowserBarcodeReader, NotFoundException } from 'https://cdn.jsdelivr.net/npm/@zxing/library/+esm';
+    window.codeReader = new BrowserBarcodeReader();
+  </script>
+
+  <!-- Custom JS -->
+  <script type="module">
     const videoElement = document.getElementById("camera");
     const resultsDiv = document.getElementById("results");
 
-    codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
+    window.codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
       if (result) {
         const barcode = result.text;
         resultsDiv.innerHTML = `Scanning... Found barcode: ${barcode}`;
 
-        // ===== Query Supabase for this product =====
-        const { data: products, error } = await supabase
+        // Fetch product from Supabase
+        const { data: products, error } = await window.supabase
           .from("products")
           .select("*")
           .eq("barcode", barcode)
@@ -57,15 +64,16 @@
 
         const product = products[0];
 
-        // ===== Fetch ingredient details =====
+        // Split ingredients from inci_raw
         const ingredientNames = product.inci_raw.split(",").map(i => i.trim());
 
-        const { data: ingredients } = await supabase
+        // Fetch ingredient details
+        const { data: ingredients } = await window.supabase
           .from("ingredients")
           .select("*")
           .in("inci_name", ingredientNames);
 
-        // ===== Calculate total comedogenic score =====
+        // Compute total comedogenic score
         let totalScore = 0;
         let ingredientInfo = "";
         ingredients.forEach(i => {
@@ -73,7 +81,7 @@
           ingredientInfo += `<li>${i.inci_name} (${i.common_name}): ${i.explanation_short}</li>`;
         });
 
-        // ===== Determine risk label =====
+        // Determine risk label
         let riskLabel = "", riskClass = "";
         if (totalScore <= 2) { riskLabel = "Low risk"; riskClass = "low"; }
         else if (totalScore <= 5) { riskLabel = "Medium risk"; riskClass = "medium"; }
@@ -87,7 +95,8 @@
           <ul>${ingredientInfo}</ul>
         `;
       }
-      if (err && !(err instanceof ZXing.NotFoundException)) {
+
+      if (err && !(err instanceof NotFoundException)) {
         console.error(err);
       }
     });
