@@ -4,123 +4,101 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Let's Be Clear – Ingredient Checker</title>
-  <!-- Supabase JS library -->
+
+  <!-- Supabase JS (loaded once) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 40px;
+      max-width: 700px;
     }
     textarea {
       width: 100%;
-      max-width: 600px;
-      padding: 10px;
-      font-size: 16px;
+      height: 120px;
     }
     button {
       margin-top: 10px;
-      padding: 8px 16px;
+      padding: 10px;
       font-size: 16px;
-      cursor: pointer;
     }
     #results {
       margin-top: 20px;
       padding: 10px;
       border: 1px solid #ccc;
-      max-width: 600px;
-    }
-    li {
-      margin-bottom: 5px;
     }
   </style>
 </head>
+
 <body>
 
   <h1>Let's Be Clear</h1>
-  <p>Paste a skincare ingredient list below to check for pore-clogging ingredients.</p>
+  <p>Paste an ingredient list (comma-separated).</p>
 
-  <textarea id="ingredientInput" rows="6" placeholder="Paste ingredients here..."></textarea>
-  <br>
-  <button id="checkButton">Analyze Ingredients</button>
+  <textarea id="ingredientInput"
+    placeholder="Water, Glycerin, Dimethicone, Lanolin"></textarea>
+
+  <button id="analyzeBtn">Analyze Ingredients</button>
+
   <div id="results"></div>
 
   <script>
-    // ===============================
-    // REPLACE WITH YOUR SUPABASE INFO
-    // ===============================
-    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co"; 
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0"; 
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    // =============================
+    // SUPABASE CONFIG (ONLY ONCE)
+    // =============================
+    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-    // Normalize text
-    function normalize(text) {
-      if (!text) return "";
-      return text
-        .toLowerCase()
-        .replace(/\(.*?\)/g, "")
-        .replace(/[^a-z0-9\/\s]/g, "")
-        .trim();
+    const supabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    function normalize(str) {
+      return str.toLowerCase().trim();
     }
 
-    // Button click
-    document.getElementById("checkButton").addEventListener("click", async () => {
-      const rawInput = document.getElementById("ingredientInput").value;
-      const inputIngredients = rawInput
-        .split(",")
-        .map(i => normalize(i))
-        .filter(i => i.length > 0);
+    document.getElementById("analyzeBtn").addEventListener("click", async () => {
+      const input = document.getElementById("ingredientInput").value;
 
-      if (inputIngredients.length === 0) {
-        document.getElementById("results").innerHTML = "<strong>Please paste ingredients!</strong>";
+      if (!input) {
+        document.getElementById("results").innerText =
+          "Please enter ingredients.";
         return;
       }
 
-      // Fetch ingredients from Supabase
-      const { data: ingredients, error } = await supabase
+      const inputIngredients = input
+        .split(",")
+        .map(i => normalize(i));
+
+      const { data, error } = await supabase
         .from("ingredients")
         .select("*");
 
       if (error) {
-        document.getElementById("results").innerHTML = "<strong>Supabase error:</strong> " + error.message;
+        document.getElementById("results").innerText =
+          "Supabase error: " + error.message;
         return;
       }
 
-      // Match input with database
-      const matches = ingredients.filter(dbIng => {
-        const inci = normalize(dbIng.inci_name);
-        const common = normalize(dbIng.common_name);
+      const matches = data.filter(row =>
+        inputIngredients.includes(normalize(row.inci_name))
+      );
 
-        let synonyms = [];
-        if (Array.isArray(dbIng.synonyms)) {
-          synonyms = dbIng.synonyms.map(s => normalize(s));
-        }
-
-        return inputIngredients.includes(inci)
-          || inputIngredients.includes(common)
-          || synonyms.some(s => inputIngredients.includes(s));
-      });
-
-      const flagged = matches.filter(i => i.auto_flag === true);
-
-      // Display results
-      const resultsDiv = document.getElementById("results");
       if (matches.length === 0) {
-        resultsDiv.innerHTML = "<strong>No ingredients matched!</strong>";
+        document.getElementById("results").innerText =
+          "No matching ingredients found.";
         return;
       }
 
-      resultsDiv.innerHTML = `
-        <h3>Found Ingredients (${matches.length})</h3>
-        <ul>
-          ${matches.map(i =>
-            `<li>
-              <strong>${i.inci_name}</strong> ${i.auto_flag ? "⚠️ Pore-clogging" : ""}
-              <br><small>${i.explanation_short || ""}</small>
-            </li>`
-          ).join("")}
-        </ul>
-        ${flagged.length > 0 ? `<p>⚠️ ${flagged.length} ingredient(s) may clog pores.</p>` : ""}
-      `;
+      document.getElementById("results").innerHTML =
+        "<h3>Matched Ingredients</h3>" +
+        matches.map(m => `
+          <strong>${m.inci_name}</strong><br>
+          Score: ${m.base_score}<br>
+          ${m.explanation_short || ""}<br><br>
+        `).join("");
     });
   </script>
 
