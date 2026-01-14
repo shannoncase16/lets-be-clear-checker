@@ -1,221 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Let’s Be Clear – Ingredient Checker</title>
-
-  <!-- Supabase CDN (loads window.supabase globally ONCE) -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's Be Clear – Ingredient Checker</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 40px;
-      max-width: 700px;
+      max-width: 800px;
     }
     textarea {
       width: 100%;
       height: 120px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      padding: 8px;
     }
     button {
-      margin-top: 12px;
-      padding: 10px;
+      padding: 8px 16px;
       font-size: 16px;
+      cursor: pointer;
     }
     #results {
       margin-top: 20px;
+      padding: 10px;
       border: 1px solid #ccc;
-      padding: 12px;
     }
-    .bad {
-      color: red;
-      font-weight: bold;
-    }
-    .good {
-      color: green;
-      font-weight: bold;
-    }
+    p { margin: 4px 0; }
+    h3 { margin-top: 20px; }
   </style>
 </head>
-
 <body>
 
-  <h1>Let’s Be Clear</h1>
-  <p>Paste a comma-separated ingredient list.</p>
+  <h1>Let's Be Clear</h1>
+  <p>Paste a skincare ingredient list below to check for pore-clogging ingredients:</p>
 
-  <textarea
-    id="ingredientInput"
-    placeholder="Water, Glycerin, Dimethicone, Lanolin"
-  ></textarea>
-
-  <button id="analyzeBtn">Analyze Ingredients</button>
-
+  <textarea id="ingredientInput" placeholder="Paste ingredients here..."></textarea>
+  <br>
+  <button id="checkButton">Analyze Ingredients</button>
   <div id="results"></div>
 
   <script>
-    // =============================
-    // SUPABASE CONFIG
-    // =============================
-    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    // ===============================
+    // REPLACE WITH YOUR SUPABASE INFO
+    // ===============================
+    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // IMPORTANT: do NOT redeclare `supabase`
-    const sb = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+    document.getElementById("checkButton").addEventListener("click", async () => {
+      const input = document.getElementById("ingredientInput").value;
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = ""; // Clear previous results
 
-    function normalize(text) {
-      return text
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .trim();
-    }
+      if (!input.trim()) {
+        resultsDiv.innerHTML = "<p>Please paste ingredients first.</p>";
+        return;
+      }
 
-    document
-      .getElementById("analyzeBtn")
-      .addEventListener("click", async () => {
+      // Normalize input: split, trim, lowercase
+      const userIngredients = input
+        .split(",")
+        .map(i => i.trim().toLowerCase())
+        .filter(i => i.length > 0);
 
-        const input = document.getElementById("ingredientInput").value;
+      // Fetch ingredients from Supabase
+      const { data: ingredients, error } = await supabase
+        .from("ingredients")
+        .select("*");
 
-        if (!input) {
-          document.getElementById("results").innerText =
-            "Please enter ingredients.";
-          return;
-        }
+      if (error) {
+        resultsDiv.innerHTML = "<strong>Error loading ingredients:</strong> " + error.message;
+        return;
+      }
 
-        const inputIngredients = input
-          .split(",")
-          .map(i => normalize(i));
-
-        const { data, error } = await sb
-          .from("ingredients")
-          .select("*");
-
-        if (error) {
-          document.getElementById("results").innerText =
-            "Supabase error: " + error.message;
-          return;
-        }
-
-        // MATCHING WITH SYNONYMS
-        const matches = data.filter(row => {
-          const names = [
-            row.inci_name,
-            row.common_name,
-            ...(row.synonyms || [])
-          ]
-            .filter(Boolean)
-            .map(n => normalize(n));
-
-          return inputIngredients.some(input =>
-            names.includes(input)
-          );
-        });
-
-        if (matches.length === 0) {
-          document.getElementById("results").innerText =
-            "No matching ingredients found.";
-          return;
-        }
-
-        // TOTAL SCORE
-        const totalScore = matches.reduce(
-          (sum, i) => sum + (i.base_score || 0),
-          0
-        );
-
-        // OUTPUT
-        document.getElementById("results").innerHTML =
-          `<strong>Total Comedogenic Score:</strong> ${totalScore}<br><br>` +
-          "<h3>Matched Ingredients</h3>" +
-          matches.map(m => `
-            <div style="margin-bottom:12px;">
-              <span class="${m.auto_flag ? "bad" : "good"}">
-                ${m.inci_name}
-              </span><br>
-              Score: ${m.base_score}<br>
-              ${m.explanation_short || ""}
-            </div>
-          `).join("");
+      // Match ingredients including synonyms
+      const matchedIngredients = ingredients.filter(ing => {
+        const synonyms = ing.synonyms || [];
+        const allNames = [ing.inci_name.toLowerCase(), ing.common_name?.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
+        return userIngredients.some(u => allNames.includes(u));
       });
+
+      if (matchedIngredients.length === 0) {
+        resultsDiv.innerHTML = "<p>No matching ingredients found.</p>";
+        return;
+      }
+
+      // Display matched ingredients and total score
+      let totalScore = 0;
+      matchedIngredients.forEach(ing => {
+        const color = ing.auto_flag ? "red" : "green";
+        totalScore += ing.base_score || 0;
+        const shortExp = ing.explanation_short || "";
+        resultsDiv.innerHTML += `<p style="color:${color}"><strong>${ing.inci_name}</strong>: ${shortExp}</p>`;
+      });
+
+      resultsDiv.innerHTML += `<p><strong>Total comedogenic score:</strong> ${totalScore}</p>`;
+
+      // Fetch alternatives for flagged ingredients
+      const flaggedIds = matchedIngredients.filter(i => i.auto_flag).map(i => i.id);
+      if (flaggedIds.length > 0) {
+        const { data: alternatives } = await supabase
+          .from("alternatives")
+          .select("*")
+          .in("ingredient_id", flaggedIds);
+
+        if (alternatives && alternatives.length > 0) {
+          resultsDiv.innerHTML += "<h3>Suggested alternatives:</h3>";
+          alternatives.forEach(a => {
+            resultsDiv.innerHTML += `<p><em>${a.alternative_inci}</em>: ${a.explanation_short || ""}</p>`;
+          });
+        }
+      }
+    });
   </script>
-<script>
-// ===============================
-// REPLACE WITH YOUR SUPABASE INFO
-// ===============================
-const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-document.getElementById("checkButton").addEventListener("click", async () => {
-  const input = document.getElementById("ingredientInput").value;
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = ""; // clear previous results
-
-  if (!input.trim()) {
-    resultsDiv.innerHTML = "<p>Please paste ingredients first.</p>";
-    return;
-  }
-
-  // Normalize input: split by comma, trim, lowercase
-  const userIngredients = input
-    .split(",")
-    .map(i => i.trim().toLowerCase())
-    .filter(i => i.length > 0);
-
-  // Fetch ingredients from Supabase
-  const { data: ingredients, error } = await supabase
-    .from("ingredients")
-    .select("*");
-
-  if (error) {
-    resultsDiv.innerHTML = "<strong>Error loading ingredients:</strong> " + error.message;
-    return;
-  }
-
-  // Match ingredients including synonyms
-  const matchedIngredients = ingredients.filter(ing => {
-    const synonyms = ing.synonyms || [];
-    const allNames = [ing.inci_name.toLowerCase(), ing.common_name?.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
-    return userIngredients.some(u => allNames.includes(u));
-  });
-
-  if (matchedIngredients.length === 0) {
-    resultsDiv.innerHTML = "<p>No matching ingredients found.</p>";
-    return;
-  }
-
-  // Display each ingredient with color and short explanation
-  let totalScore = 0;
-  matchedIngredients.forEach(ing => {
-    const color = ing.auto_flag ? "red" : "green";
-    totalScore += ing.base_score || 0;
-    const shortExp = ing.explanation_short || "";
-    resultsDiv.innerHTML += `<p style="color:${color}"><strong>${ing.inci_name}</strong>: ${shortExp}</p>`;
-  });
-
-  // Display total score
-  resultsDiv.innerHTML += `<p><strong>Total comedogenic score:</strong> ${totalScore}</p>`;
-
-  // Fetch alternatives for flagged ingredients
-  const flaggedIds = matchedIngredients.filter(i => i.auto_flag).map(i => i.id);
-  if (flaggedIds.length > 0) {
-    const { data: alternatives } = await supabase
-      .from("alternatives")
-      .select("*")
-      .in("ingredient_id", flaggedIds);
-
-    if (alternatives && alternatives.length > 0) {
-      resultsDiv.innerHTML += "<h3>Suggested alternatives:</h3>";
-      alternatives.forEach(a => {
-        resultsDiv.innerHTML += `<p><em>${a.alternative_inci}</em>: ${a.explanation_short || ""}</p>`;
-      });
-    }
-  }
-});
-</script>
 
 </body>
 </html>
