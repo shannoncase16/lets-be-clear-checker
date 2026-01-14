@@ -6,6 +6,7 @@
 
   <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
   <style>
     body {
@@ -59,6 +60,9 @@
   <br />
 
   <button id="analyzeBtn">Analyze Ingredients</button>
+<br><br>
+<button id="scanBtn">Scan Barcode</button>
+<div id="scanner" style="width:100%; max-width:400px; margin-top:15px;"></div>
 
   <div id="output" class="result"></div>
 
@@ -180,6 +184,57 @@
 
       output.innerHTML = html;
     });
+    document.getElementById("scanBtn").addEventListener("click", () => {
+  const scannerDiv = document.getElementById("scanner");
+  scannerDiv.innerHTML = "Starting camera…";
+
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: scannerDiv,
+      constraints: {
+        facingMode: "environment"
+      }
+    },
+    decoder: {
+      readers: ["ean_reader", "ean_13_reader", "upc_reader"]
+    }
+  }, function(err) {
+    if (err) {
+      scannerDiv.innerHTML = "Camera error.";
+      console.error(err);
+      return;
+    }
+    Quagga.start();
+  });
+
+  Quagga.onDetected(async function(result) {
+    const code = result.codeResult.code;
+    Quagga.stop();
+    scannerDiv.innerHTML = `Scanned barcode: ${code}`;
+
+    // Lookup product by barcode
+    const { data, error } = await supabaseClient
+      .from("products")
+      .select("*")
+      .eq("barcode", code)
+      .single();
+
+    if (error || !data) {
+      scannerDiv.innerHTML =
+        "Product not found in database yet.";
+      return;
+    }
+
+    // Auto-fill ingredient box and analyze
+    document.getElementById("ingredientInput").value =
+      data.inci_list || "";
+
+    document.getElementById("analyzeBtn").click();
+  });
+});
+
   </script>
 
 </body>
