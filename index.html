@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Let’s Be Clear</title>
+  <title>Let's Be Clear – Ingredient Checker</title>
 
-  <!-- Load Supabase ONCE -->
+  <!-- Supabase CDN (loads global window.supabase) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -32,67 +32,83 @@
 </head>
 
 <body>
-  <h1>Let’s Be Clear</h1>
-  <p>Paste an ingredient list (comma-separated)</p>
 
-  <textarea id="input" placeholder="Water, Glycerin, Lanolin"></textarea>
-  <button id="analyze">Analyze Ingredients</button>
+  <h1>Let’s Be Clear</h1>
+  <p>Paste a comma-separated ingredient list.</p>
+
+  <textarea
+    id="ingredientInput"
+    placeholder="Water, Glycerin, Dimethicone, Lanolin"
+  ></textarea>
+
+  <button id="analyzeBtn">Analyze Ingredients</button>
 
   <div id="results"></div>
 
   <script>
-    // Supabase config
+    // =============================
+    // SUPABASE CONFIG
+    // =============================
     const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
-    const supabase = window.supabase.createClient(
+    // IMPORTANT:
+    // We DO NOT redeclare `supabase`
+    // We create our own client variable instead
+    const sb = window.supabase.createClient(
       SUPABASE_URL,
-      SUPABASE_KEY
+      SUPABASE_ANON_KEY
     );
 
     function normalize(text) {
       return text.toLowerCase().trim();
     }
 
-    document.getElementById("analyze").addEventListener("click", async () => {
-      const raw = document.getElementById("input").value;
-      if (!raw) {
-        document.getElementById("results").innerText =
-          "Please enter ingredients.";
-        return;
-      }
+    document
+      .getElementById("analyzeBtn")
+      .addEventListener("click", async () => {
 
-      const inputIngredients = raw
-        .split(",")
-        .map(i => normalize(i));
+        const input = document.getElementById("ingredientInput").value;
 
-      const { data, error } = await supabase
-        .from("ingredients")
-        .select("*");
+        if (!input) {
+          document.getElementById("results").innerText =
+            "Please enter ingredients.";
+          return;
+        }
 
-      if (error) {
-        document.getElementById("results").innerText =
-          "Supabase error: " + error.message;
-        return;
-      }
+        const inputIngredients = input
+          .split(",")
+          .map(i => normalize(i));
 
-      const matches = data.filter(row =>
-        inputIngredients.includes(normalize(row.inci_name))
-      );
+        const { data, error } = await sb
+          .from("ingredients")
+          .select("*");
 
-      if (matches.length === 0) {
-        document.getElementById("results").innerText =
-          "No matching ingredients found.";
-        return;
-      }
+        if (error) {
+          document.getElementById("results").innerText =
+            "Supabase error: " + error.message;
+          return;
+        }
 
-      document.getElementById("results").innerHTML =
-        matches.map(m => `
-          <strong>${m.inci_name}</strong><br>
-          Score: ${m.base_score}<br>
-          ${m.explanation_short || ""}<br><br>
-        `).join("");
-    });
+        const matches = data.filter(row =>
+          inputIngredients.includes(normalize(row.inci_name))
+        );
+
+        if (matches.length === 0) {
+          document.getElementById("results").innerText =
+            "No matching ingredients found.";
+          return;
+        }
+
+        document.getElementById("results").innerHTML =
+          "<h3>Matched Ingredients</h3>" +
+          matches.map(m => `
+            <strong>${m.inci_name}</strong><br>
+            Score: ${m.base_score}<br>
+            ${m.explanation_short || ""}<br><br>
+          `).join("");
+      });
   </script>
+
 </body>
 </html>
