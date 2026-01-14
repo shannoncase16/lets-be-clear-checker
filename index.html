@@ -1,241 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Let’s Be Clear – Ingredient Checker</title>
-
-  <!-- Supabase v2 -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's Be Clear – Barcode Scanner</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 750px;
-      margin: 40px auto;
-      padding: 20px;
-    }
-    textarea {
-      width: 100%;
-      height: 120px;
-      font-size: 14px;
-    }
-    button {
-      margin-top: 12px;
-      padding: 10px 16px;
-      font-size: 15px;
-      cursor: pointer;
-    }
-    .result {
-      margin-top: 24px;
-      padding: 16px;
-      border: 1px solid #ccc;
-    }
-    .low {
-      color: #2e7d32;
-      font-weight: bold;
-    }
-    .moderate {
-      color: #f9a825;
-      font-weight: bold;
-    }
-    .high {
-      color: #b00020;
-      font-weight: bold;
-    }
-    ul {
-      margin-top: 12px;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
+    #results { margin-top: 20px; padding: 10px; border: 1px solid #ccc; max-width: 600px; }
+    .low { color: green; }
+    .medium { color: orange; }
+    .high { color: red; }
   </style>
 </head>
-
 <body>
+  <h1>Let's Be Clear – Barcode Scanner</h1>
 
-  <h2>Ingredient Analyzer</h2>
-
-  <p>Paste a product ingredient list (comma-separated):</p>
-
-  <textarea id="ingredientInput" placeholder="Water, Glycerin, Lanolin, Dimethicone"></textarea>
-
-  <br />
-
-  <button id="analyzeBtn">Analyze Ingredients</button>
-<br><br>
-<button id="scanBtn">Scan Barcode</button>
-<div id="scanner" style="width:100%; max-width:400px; margin-top:15px;"></div>
-
-  <div id="output" class="result"></div>
+  <p>Point your camera at a product barcode:</p>
+  <video id="camera" autoplay></video>
+  <div id="results">No product scanned yet.</div>
 
   <script>
-    // -----------------------------
-    // Supabase configuration
-    // -----------------------------
-    const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    // ===== Supabase setup =====
+    const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+    const supabase = Supabase.createClient(supabaseUrl, supabaseKey);
 
-    const supabaseClient = supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+    // ===== Barcode scanner setup =====
+    const codeReader = new ZXing.BrowserBarcodeReader();
+    const videoElement = document.getElementById("camera");
+    const resultsDiv = document.getElementById("results");
 
-    // -----------------------------
-    // Utility functions
-    // -----------------------------
-    function normalize(text) {
-      return text
-        .toLowerCase()
-        .replace(/[^a-z0-9\/\-\s]/g, "")
-        .trim();
-    }
+    codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
+      if (result) {
+        const barcode = result.text;
+        resultsDiv.innerHTML = `Scanning... Found barcode: ${barcode}`;
 
-    function getRiskInfo(totalScore) {
-      if (totalScore <= 3) {
-        return {
-          label: "Low risk for pore clogging",
-          class: "low",
-          explanation:
-            "This product contains mostly non-comedogenic ingredients and is unlikely to clog pores for most people."
-        };
-      } else if (totalScore <= 7) {
-        return {
-          label: "Moderate risk for pore clogging",
-          class: "moderate",
-          explanation:
-            "This product contains some ingredients that may clog pores, especially in acne-prone or oily skin."
-        };
-      } else {
-        return {
-          label: "High risk for pore clogging",
-          class: "high",
-          explanation:
-            "This product contains multiple ingredients associated with clogged pores and may worsen breakouts."
-        };
-      }
-    }
+        // ===== Query Supabase for this product =====
+        const { data: products, error } = await supabase
+          .from("products")
+          .select("*")
+          .eq("barcode", barcode)
+          .limit(1);
 
-    // -----------------------------
-    // Main analyzer
-    // -----------------------------
-    document.getElementById("analyzeBtn").addEventListener("click", async () => {
-      const output = document.getElementById("output");
-      output.innerHTML = "Analyzing…";
+        if (error) {
+          resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+          return;
+        }
 
-      const rawInput = document.getElementById("ingredientInput").value;
-      if (!rawInput.trim()) {
-        output.innerHTML = "Please enter an ingredient list.";
-        return;
-      }
+        if (!products || products.length === 0) {
+          resultsDiv.innerHTML = "No product found with this barcode.";
+          return;
+        }
 
-      const inputIngredients = rawInput
-        .split(",")
-        .map(i => normalize(i))
-        .filter(Boolean);
+        const product = products[0];
 
-      const { data, error } = await supabaseClient
-        .from("ingredients")
-        .select("*");
+        // ===== Fetch ingredient details =====
+        const ingredientNames = product.inci_raw.split(",").map(i => i.trim());
 
-      if (error) {
-        output.innerHTML = "Error loading ingredient database.";
-        console.error(error);
-        return;
-      }
+        const { data: ingredients } = await supabase
+          .from("ingredients")
+          .select("*")
+          .in("inci_name", ingredientNames);
 
-      let totalScore = 0;
-      let matches = [];
-
-      inputIngredients.forEach(input => {
-        data.forEach(row => {
-          if (normalize(row.inci_name) === input) {
-            matches.push(row);
-            totalScore += row.base_score || 0;
-          }
+        // ===== Calculate total comedogenic score =====
+        let totalScore = 0;
+        let ingredientInfo = "";
+        ingredients.forEach(i => {
+          totalScore += i.base_score;
+          ingredientInfo += `<li>${i.inci_name} (${i.common_name}): ${i.explanation_short}</li>`;
         });
-      });
 
-      if (matches.length === 0) {
-        output.innerHTML = "No matching ingredients found.";
-        return;
-      }
+        // ===== Determine risk label =====
+        let riskLabel = "", riskClass = "";
+        if (totalScore <= 2) { riskLabel = "Low risk"; riskClass = "low"; }
+        else if (totalScore <= 5) { riskLabel = "Medium risk"; riskClass = "medium"; }
+        else { riskLabel = "High risk"; riskClass = "high"; }
 
-      const risk = getRiskInfo(totalScore);
-
-      let html = `
-        <h3>Total Comedogenic Score: ${totalScore}</h3>
-        <p class="${risk.class}">${risk.label}</p>
-        <p>${risk.explanation}</p>
-        <hr />
-        <h4>Ingredient Breakdown</h4>
-        <ul>
-      `;
-
-      matches.forEach(m => {
-        html += `
-          <li>
-            <strong>${m.inci_name}</strong> —
-            Score: ${m.base_score}
-            <br />
-            ${m.explanation_short || ""}
-          </li>
+        resultsDiv.innerHTML = `
+          <h2>${product.name}</h2>
+          <p>Total comedogenic score: <strong>${totalScore}</strong> 
+          <span class="${riskClass}">(${riskLabel})</span></p>
+          <h3>Ingredients:</h3>
+          <ul>${ingredientInfo}</ul>
         `;
-      });
-
-      html += "</ul>";
-
-      output.innerHTML = html;
-    });
-    document.getElementById("scanBtn").addEventListener("click", () => {
-  const scannerDiv = document.getElementById("scanner");
-  scannerDiv.innerHTML = "Starting camera…";
-
-  Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: scannerDiv,
-      constraints: {
-        facingMode: "environment"
       }
-    },
-    decoder: {
-      readers: ["ean_reader", "ean_13_reader", "upc_reader"]
-    }
-  }, function(err) {
-    if (err) {
-      scannerDiv.innerHTML = "Camera error.";
-      console.error(err);
-      return;
-    }
-    Quagga.start();
-  });
-
-  Quagga.onDetected(async function(result) {
-    const code = result.codeResult.code;
-    Quagga.stop();
-    scannerDiv.innerHTML = `Scanned barcode: ${code}`;
-
-    // Lookup product by barcode
-    const { data, error } = await supabaseClient
-      .from("products")
-      .select("*")
-      .eq("barcode", code)
-      .single();
-
-    if (error || !data) {
-      scannerDiv.innerHTML =
-        "Product not found in database yet.";
-      return;
-    }
-
-    // Auto-fill ingredient box and analyze
-    document.getElementById("ingredientInput").value =
-      data.inci_list || "";
-
-    document.getElementById("analyzeBtn").click();
-  });
-});
-
+      if (err && !(err instanceof ZXing.NotFoundException)) {
+        console.error(err);
+      }
+    });
   </script>
-
 </body>
 </html>
