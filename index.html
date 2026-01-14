@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <title>Let’s Be Clear – Ingredient Checker</title>
 
-  <!-- Supabase v2 CDN -->
+  <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 700px;
+      max-width: 750px;
       margin: 40px auto;
       padding: 20px;
     }
@@ -26,17 +26,24 @@
       cursor: pointer;
     }
     .result {
-      margin-top: 20px;
-      padding: 12px;
+      margin-top: 24px;
+      padding: 16px;
       border: 1px solid #ccc;
     }
-    .bad {
+    .low {
+      color: #2e7d32;
+      font-weight: bold;
+    }
+    .moderate {
+      color: #f9a825;
+      font-weight: bold;
+    }
+    .high {
       color: #b00020;
       font-weight: bold;
     }
-    .good {
-      color: #2e7d32;
-      font-weight: bold;
+    ul {
+      margin-top: 12px;
     }
   </style>
 </head>
@@ -45,7 +52,7 @@
 
   <h2>Ingredient Analyzer</h2>
 
-  <p>Paste an ingredient list (comma-separated):</p>
+  <p>Paste a product ingredient list (comma-separated):</p>
 
   <textarea id="ingredientInput" placeholder="Water, Glycerin, Lanolin, Dimethicone"></textarea>
 
@@ -56,9 +63,9 @@
   <div id="output" class="result"></div>
 
   <script>
-    // -------------------------------
-    // Supabase setup (DECLARE ONCE)
-    // -------------------------------
+    // -----------------------------
+    // Supabase configuration
+    // -----------------------------
     const SUPABASE_URL = "https://hmfjdsbfkgehybmeosxw.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
 
@@ -67,9 +74,9 @@
       SUPABASE_ANON_KEY
     );
 
-    // -------------------------------
-    // Helpers
-    // -------------------------------
+    // -----------------------------
+    // Utility functions
+    // -----------------------------
     function normalize(text) {
       return text
         .toLowerCase()
@@ -77,16 +84,41 @@
         .trim();
     }
 
-    // -------------------------------
-    // Main logic
-    // -------------------------------
+    function getRiskInfo(totalScore) {
+      if (totalScore <= 3) {
+        return {
+          label: "Low risk for pore clogging",
+          class: "low",
+          explanation:
+            "This product contains mostly non-comedogenic ingredients and is unlikely to clog pores for most people."
+        };
+      } else if (totalScore <= 7) {
+        return {
+          label: "Moderate risk for pore clogging",
+          class: "moderate",
+          explanation:
+            "This product contains some ingredients that may clog pores, especially in acne-prone or oily skin."
+        };
+      } else {
+        return {
+          label: "High risk for pore clogging",
+          class: "high",
+          explanation:
+            "This product contains multiple ingredients associated with clogged pores and may worsen breakouts."
+        };
+      }
+    }
+
+    // -----------------------------
+    // Main analyzer
+    // -----------------------------
     document.getElementById("analyzeBtn").addEventListener("click", async () => {
       const output = document.getElementById("output");
       output.innerHTML = "Analyzing…";
 
       const rawInput = document.getElementById("ingredientInput").value;
       if (!rawInput.trim()) {
-        output.innerHTML = "Please enter ingredients.";
+        output.innerHTML = "Please enter an ingredient list.";
         return;
       }
 
@@ -118,19 +150,26 @@
       });
 
       if (matches.length === 0) {
-        output.innerHTML = "No ingredients matched in the database.";
+        output.innerHTML = "No matching ingredients found.";
         return;
       }
 
-      let html = `<h3>Total Comedogenic Score: ${totalScore}</h3><ul>`;
+      const risk = getRiskInfo(totalScore);
+
+      let html = `
+        <h3>Total Comedogenic Score: ${totalScore}</h3>
+        <p class="${risk.class}">${risk.label}</p>
+        <p>${risk.explanation}</p>
+        <hr />
+        <h4>Ingredient Breakdown</h4>
+        <ul>
+      `;
 
       matches.forEach(m => {
         html += `
           <li>
             <strong>${m.inci_name}</strong> —
-            <span class="${m.auto_flag ? "bad" : "good"}">
-              Score: ${m.base_score}
-            </span>
+            Score: ${m.base_score}
             <br />
             ${m.explanation_short || ""}
           </li>
@@ -138,6 +177,7 @@
       });
 
       html += "</ul>";
+
       output.innerHTML = html;
     });
   </script>
