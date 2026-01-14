@@ -141,6 +141,81 @@
           `).join("");
       });
   </script>
+<script>
+// ===============================
+// REPLACE WITH YOUR SUPABASE INFO
+// ===============================
+const supabaseUrl = "https://hmfjdsbfkgehybmeosxw.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0";
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+document.getElementById("checkButton").addEventListener("click", async () => {
+  const input = document.getElementById("ingredientInput").value;
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = ""; // clear previous results
+
+  if (!input.trim()) {
+    resultsDiv.innerHTML = "<p>Please paste ingredients first.</p>";
+    return;
+  }
+
+  // Normalize input: split by comma, trim, lowercase
+  const userIngredients = input
+    .split(",")
+    .map(i => i.trim().toLowerCase())
+    .filter(i => i.length > 0);
+
+  // Fetch ingredients from Supabase
+  const { data: ingredients, error } = await supabase
+    .from("ingredients")
+    .select("*");
+
+  if (error) {
+    resultsDiv.innerHTML = "<strong>Error loading ingredients:</strong> " + error.message;
+    return;
+  }
+
+  // Match ingredients including synonyms
+  const matchedIngredients = ingredients.filter(ing => {
+    const synonyms = ing.synonyms || [];
+    const allNames = [ing.inci_name.toLowerCase(), ing.common_name?.toLowerCase(), ...synonyms.map(s => s.toLowerCase())];
+    return userIngredients.some(u => allNames.includes(u));
+  });
+
+  if (matchedIngredients.length === 0) {
+    resultsDiv.innerHTML = "<p>No matching ingredients found.</p>";
+    return;
+  }
+
+  // Display each ingredient with color and short explanation
+  let totalScore = 0;
+  matchedIngredients.forEach(ing => {
+    const color = ing.auto_flag ? "red" : "green";
+    totalScore += ing.base_score || 0;
+    const shortExp = ing.explanation_short || "";
+    resultsDiv.innerHTML += `<p style="color:${color}"><strong>${ing.inci_name}</strong>: ${shortExp}</p>`;
+  });
+
+  // Display total score
+  resultsDiv.innerHTML += `<p><strong>Total comedogenic score:</strong> ${totalScore}</p>`;
+
+  // Fetch alternatives for flagged ingredients
+  const flaggedIds = matchedIngredients.filter(i => i.auto_flag).map(i => i.id);
+  if (flaggedIds.length > 0) {
+    const { data: alternatives } = await supabase
+      .from("alternatives")
+      .select("*")
+      .in("ingredient_id", flaggedIds);
+
+    if (alternatives && alternatives.length > 0) {
+      resultsDiv.innerHTML += "<h3>Suggested alternatives:</h3>";
+      alternatives.forEach(a => {
+        resultsDiv.innerHTML += `<p><em>${a.alternative_inci}</em>: ${a.explanation_short || ""}</p>`;
+      });
+    }
+  }
+});
+</script>
 
 </body>
 </html>
