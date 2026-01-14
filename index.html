@@ -90,9 +90,20 @@
           return;
         }
 
-        const matches = data.filter(row =>
-          inputIngredients.includes(normalize(row.inci_name))
-        );
+const matches = data.filter(row => {
+  const names = [
+    row.inci_name,
+    row.common_name,
+    ...(row.synonyms || [])
+  ]
+    .filter(Boolean)
+    .map(n => normalize(n));
+
+  return inputIngredients.some(input =>
+    names.includes(input)
+  );
+});
+
 
         if (matches.length === 0) {
           document.getElementById("results").innerText =
@@ -100,13 +111,18 @@
           return;
         }
 
-        document.getElementById("results").innerHTML =
-          "<h3>Matched Ingredients</h3>" +
-          matches.map(m => `
-            <strong>${m.inci_name}</strong><br>
-            Score: ${m.base_score}<br>
-            ${m.explanation_short || ""}<br><br>
-          `).join("");
+document.getElementById("results").innerHTML =
+  "<h3>Matched Ingredients</h3>" +
+  matches.map(m => `
+    <div style="margin-bottom:12px;">
+      <strong style="color:${m.auto_flag ? "red" : "green"};">
+        ${m.inci_name}
+      </strong><br>
+      Score: ${m.base_score}<br>
+      ${m.explanation_short || ""}
+    </div>
+  `).join("");
+
       });
   </script>
 
