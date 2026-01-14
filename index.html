@@ -39,13 +39,17 @@
   <script type="module">
     const videoElement = document.getElementById("camera");
     const resultsDiv = document.getElementById("results");
+    let scanInProgress = false; // Lock to prevent multiple scans at once
 
     window.codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
+      if (scanInProgress) return; // Skip if already processing a scan
+
       if (result) {
+        scanInProgress = true; // Lock scan
         const barcode = result.text;
         resultsDiv.innerHTML = `Scanning... Found barcode: ${barcode}`;
 
-        // Fetch product from Supabase
+        // Query Supabase for product
         const { data: products, error } = await window.supabase
           .from("products")
           .select("*")
@@ -54,11 +58,13 @@
 
         if (error) {
           resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+          scanInProgress = false;
           return;
         }
 
         if (!products || products.length === 0) {
           resultsDiv.innerHTML = "No product found with this barcode.";
+          scanInProgress = false;
           return;
         }
 
@@ -67,7 +73,7 @@
         // Split ingredients from inci_raw
         const ingredientNames = product.inci_raw.split(",").map(i => i.trim());
 
-        // Fetch ingredient details
+        // Fetch ingredient details from Supabase
         const { data: ingredients } = await window.supabase
           .from("ingredients")
           .select("*")
@@ -94,6 +100,9 @@
           <h3>Ingredients:</h3>
           <ul>${ingredientInfo}</ul>
         `;
+
+        // Unlock scan after 3 seconds to allow scanning next product
+        setTimeout(() => { scanInProgress = false; }, 3000);
       }
 
       if (err && !(err instanceof NotFoundException)) {
