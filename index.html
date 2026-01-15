@@ -1,112 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Let’s Be Clear – Barcode Analyzer</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's Be Clear – Ingredient Checker</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      max-width: 600px;
-    }
-    video {
-      width: 100%;
-      border: 1px solid #ccc;
-      margin-bottom: 10px;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      font-size: 16px;
-    }
-    #results {
-      margin-top: 20px;
-      padding: 12px;
-      border: 1px solid #ccc;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; max-width: 600px; margin-bottom: 10px; }
+    button { padding: 8px 16px; font-size: 16px; margin-bottom: 20px; }
+    video { width: 100%; max-width: 400px; border: 1px solid #ccc; margin-bottom: 20px; }
+    #results { margin-top: 20px; padding: 10px; border: 1px solid #ccc; max-width: 600px; }
     .low { color: green; }
     .medium { color: orange; }
     .high { color: red; }
   </style>
 </head>
-
 <body>
-  <h1>Let’s Be Clear</h1>
+  <h1>Let's Be Clear – Ingredient Checker</h1>
 
-  <h3>Scan a barcode</h3>
+  <h2>Manual INCI Input</h2>
+  <textarea id="ingredientInput" rows="4" placeholder="Paste ingredients separated by commas"></textarea><br>
+  <button id="checkButton">Analyze Ingredients</button>
+
+  <h2>Barcode Scanner</h2>
   <video id="camera" autoplay></video>
 
-  <h3>Or enter barcode manually</h3>
-  <input id="barcodeInput" placeholder="Enter barcode number"/>
-  <button id="analyzeBtn">Analyze Product</button>
+  <div id="results">No product analyzed yet.</div>
 
-  <div id="results">Waiting for barcode…</div>
-
-  <!-- Supabase -->
+  <!-- Supabase JS -->
   <script type="module">
-    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
     window.supabase = createClient(
-      "https://hmfjdsbfkgehybmeosxw.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0"
+      "https://hmfjdsbfkgehybmeosxw.supabase.co", // <-- Replace with your Supabase URL
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0" // <-- Replace with your anon key
     );
   </script>
 
-  <!-- ZXing -->
+  <!-- ZXing Barcode Scanner -->
   <script type="module">
-    import { BrowserBarcodeReader } from "https://cdn.jsdelivr.net/npm/@zxing/library/+esm";
+    import { BrowserBarcodeReader, NotFoundException } from 'https://cdn.jsdelivr.net/npm/@zxing/library/+esm';
+    window.codeReader = new BrowserBarcodeReader();
+  </script>
 
-    const video = document.getElementById("camera");
-    const results = document.getElementById("results");
-    const input = document.getElementById("barcodeInput");
-    const button = document.getElementById("analyzeBtn");
+  <!-- Custom JS -->
+  <script type="module">
+    const resultsDiv = document.getElementById("results");
 
-    const reader = new BrowserBarcodeReader();
-    let locked = false;
+    // ------------------ Manual INCI Analysis ------------------
+    document.getElementById("checkButton").addEventListener("click", async () => {
+      const input = document.getElementById("ingredientInput").value;
+      if (!input.trim()) {
+        resultsDiv.innerHTML = "Please paste some ingredients.";
+        return;
+      }
+      const ingredientNames = input.split(",").map(i => i.trim());
 
-    async function analyzeBarcode(barcode) {
-      results.innerHTML = `<strong>Scanned barcode:</strong> ${barcode}<br>Looking up product…`;
-
-      const { data, error } = await window.supabase
-        .from("products")
+      const { data: ingredients, error } = await window.supabase
+        .from("ingredients")
         .select("*")
-        .eq("barcode", barcode)
-        .single();
+        .in("inci_name", ingredientNames);
 
-      if (error || !data) {
-        results.innerHTML = `
-          <strong>Scanned barcode:</strong> ${barcode}<br>
-          ❌ Product not found in database
-        `;
+      if (error) {
+        resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
         return;
       }
 
-      results.innerHTML = `
-        <h2>${data.name}</h2>
-        <p><strong>Barcode:</strong> ${barcode}</p>
-        <p>Total comedogenic score: <strong>${data.total_score}</strong></p>
-      `;
-    }
-
-    // CAMERA SCAN
-    reader.decodeFromVideoDevice(null, video, (result) => {
-      if (result && !locked) {
-        locked = true;
-        const barcode = result.text.trim();
-        input.value = barcode;
-        analyzeBarcode(barcode);
-        reader.reset(); // HARD STOP CAMERA
+      if (!ingredients || ingredients.length === 0) {
+        resultsDiv.innerHTML = "No ingredients matched. Check spelling or synonyms.";
+        return;
       }
+
+      let totalScore = 0;
+      let ingredientInfo = "";
+
+      ingredients.forEach(i => {
+        const score = Number(i.base_score ?? 0);
+        totalScore += score;
+        ingredientInfo += `<li>${i.inci_name} (${i.common_name}): ${i.explanation_short ?? ""}</li>`;
+      });
+
+      let riskLabel = "", riskClass = "";
+      if (totalScore <= 2) { riskLabel = "Low risk"; riskClass = "low"; }
+      else if (totalScore <= 5) { riskLabel = "Medium risk"; riskClass = "medium"; }
+      else { riskLabel = "High risk"; riskClass = "high"; }
+
+      resultsDiv.innerHTML = `
+        <p>Total comedogenic score: <strong>${totalScore}</strong> 
+        <span class="${riskClass}">(${riskLabel})</span></p>
+        <h3>Ingredients:</h3>
+        <ul>${ingredientInfo}</ul>
+      `;
     });
 
-    // MANUAL INPUT
-    button.addEventListener("click", () => {
-      const barcode = input.value.trim();
-      if (!barcode) return alert("Enter a barcode");
-      analyzeBarcode(barcode);
+    // ------------------ Barcode Scanner ------------------
+    const videoElement = document.getElementById("camera");
+    let scanInProgress = false;
+
+    window.codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
+      if (scanInProgress) return;
+
+      if (result) {
+        scanInProgress = true;
+        const barcode = result.text;
+
+        const { data: products, error } = await window.supabase
+          .from("products")
+          .select("*")
+          .eq("barcode", barcode)
+          .limit(1);
+
+        if (error) {
+          resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+          scanInProgress = false;
+          return;
+        }
+
+        if (!products || products.length === 0) {
+          resultsDiv.innerHTML = `No product found with barcode: ${barcode}`;
+          scanInProgress = false;
+          return;
+        }
+
+        const product = products[0];
+        const ingredientNames = product.inci_raw.split(",").map(i => i.trim());
+
+        const { data: ingredients } = await window.supabase
+          .from("ingredients")
+          .select("*")
+          .in("inci_name", ingredientNames);
+
+        if (!ingredients || ingredients.length === 0) {
+          resultsDiv.innerHTML = `
+            <h2>${product.name}</h2>
+            <p>No ingredient data matched. Check Supabase ingredients table.</p>
+          `;
+          scanInProgress = false;
+          return;
+        }
+
+        let totalScore = 0;
+        let ingredientInfo = "";
+
+        ingredients.forEach(i => {
+          const score = Number(i.base_score ?? 0);
+          totalScore += score;
+          ingredientInfo += `<li>${i.inci_name} (${i.common_name}): ${i.explanation_short ?? ""}</li>`;
+        });
+
+        let riskLabel = "", riskClass = "";
+        if (totalScore <= 2) { riskLabel = "Low risk"; riskClass = "low"; }
+        else if (totalScore <= 5) { riskLabel = "Medium risk"; riskClass = "medium"; }
+        else { riskLabel = "High risk"; riskClass = "high"; }
+
+        resultsDiv.innerHTML = `
+          <h2>${product.name}</h2>
+          <p>Total comedogenic score: <strong>${totalScore}</strong> 
+          <span class="${riskClass}">(${riskLabel})</span></p>
+          <h3>Ingredients:</h3>
+          <ul>${ingredientInfo}</ul>
+        `;
+
+        setTimeout(() => { scanInProgress = false; }, 3000);
+      }
+
+      if (err && !(err instanceof NotFoundException)) {
+        console.error(err);
+      }
     });
   </script>
 </body>
