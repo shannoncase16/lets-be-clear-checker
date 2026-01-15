@@ -1,141 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>Let's Be Clear – Ingredient Checker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    textarea { width: 100%; max-width: 600px; height: 100px; margin-bottom: 10px; }
-    button { padding: 8px 16px; font-size: 16px; }
-    video { width: 100%; max-width: 400px; border: 1px solid #ccc; margin-top: 20px; }
-    #results { margin-top: 20px; padding: 10px; border: 1px solid #ccc; max-width: 600px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 700px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    video {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+
+    input, button {
+      padding: 8px;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    #results {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+    }
+
+    .flag {
+      color: #b00020;
+      font-weight: bold;
+      margin-left: 6px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>Let's Be Clear – Ingredient Checker</h1>
 
-  <h2>Manual Ingredient Input</h2>
-  <textarea id="ingredientInput" placeholder="Paste ingredients here..."></textarea><br>
-  <button id="checkButton">Analyze Ingredients</button>
+  <h1>Let's Be Clear</h1>
 
-  <h2>Barcode Scanner</h2>
-  <p>Point your camera at a product barcode:</p>
-  <video id="camera" autoplay></video>
+  <p><strong>Scan a barcode</strong> or <strong>enter one manually</strong></p>
 
-  <div id="results">No product scanned yet.</div>
+  <!-- Manual barcode entry -->
+  <input id="barcodeInput" placeholder="Enter barcode manually" />
+  <button id="lookupBtn">Analyze Product</button>
 
-  <!-- Supabase ES Module -->
+  <!-- Scanner -->
+  <video id="camera" autoplay muted playsinline></video>
+  <p id="scanStatus">Ready to scan</p>
+  <button id="resetBtn" style="display:none;">Scan another product</button>
+
+  <div id="results">No product analyzed yet.</div>
+
+  <!-- Supabase -->
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
     window.supabase = createClient(
-      "https://hmfjdsbfkgehybmeosxw.supabase.co",     // <-- Replace with your Supabase URL
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0"                     // <-- Replace with your Supabase anon key
+      "https://hmfjdsbfkgehybmeosxw.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0"
     );
   </script>
 
-  <!-- ZXing Barcode Scanner ES Module -->
+  <!-- ZXing -->
   <script type="module">
-    import { BrowserBarcodeReader, NotFoundException } from 'https://cdn.jsdelivr.net/npm/@zxing/library/+esm';
-    window.codeReader = new BrowserBarcodeReader();
-  </script>
+    import { BrowserBarcodeReader } from "https://cdn.jsdelivr.net/npm/@zxing/library/+esm";
 
-  <!-- Custom JS -->
-  <script type="module">
+    const codeReader = new BrowserBarcodeReader();
+    const video = document.getElementById("camera");
     const resultsDiv = document.getElementById("results");
-    const videoElement = document.getElementById("camera");
-    const checkButton = document.getElementById("checkButton");
-    const ingredientInput = document.getElementById("ingredientInput");
+    const scanStatus = document.getElementById("scanStatus");
+    const resetBtn = document.getElementById("resetBtn");
 
-    // =========================
-    // Function to analyze ingredients
-    // =========================
-    async function analyzeIngredients(inputList, productName="Manual Entry") {
-      const ingredientNames = inputList.split(",").map(i => i.trim()).filter(Boolean);
+    let scanLocked = false;
 
-      if (ingredientNames.length === 0) {
-        resultsDiv.innerHTML = "Please enter some ingredients.";
+    async function startScanner() {
+      scanLocked = false;
+      scanStatus.textContent = "Ready to scan";
+      resetBtn.style.display = "none";
+
+      await codeReader.decodeFromVideoDevice(null, video, (result, err) => {
+        if (result && !scanLocked) {
+          scanLocked = true;
+          stopScanner();
+          handleBarcode(result.text);
+        }
+      });
+    }
+
+    function stopScanner() {
+      codeReader.reset();
+      scanStatus.textContent = "Barcode detected";
+    }
+
+    resetBtn.onclick = () => {
+      resultsDiv.innerHTML = "Ready for next scan.";
+      startScanner();
+    };
+
+    async function handleBarcode(barcode) {
+      scanStatus.textContent = `Barcode: ${barcode}`;
+      resetBtn.style.display = "block";
+
+      const { data: products, error } = await window.supabase
+        .from("products")
+        .select("*")
+        .eq("barcode", barcode)
+        .limit(1);
+
+      if (error || !products || products.length === 0) {
+        resultsDiv.innerHTML = `<strong>Product not found.</strong><br>Barcode: ${barcode}`;
         return;
       }
 
-      // Fetch ingredient info from Supabase
-      const { data: ingredients, error } = await window.supabase
+      const product = products[0];
+
+      const ingredientNames = product.inci_raw
+        .split(",")
+        .map(i => i.trim());
+
+      const { data: ingredients } = await window.supabase
         .from("ingredients")
         .select("*")
         .in("inci_name", ingredientNames);
 
-      if (error) {
-        resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
-        return;
-      }
+      let ingredientList = "";
 
-      if (!ingredients || ingredients.length === 0) {
-        resultsDiv.innerHTML = "No matching ingredients found in database.";
-        return;
-      }
-
-      let ingredientInfo = '';
       ingredients.forEach(i => {
-        const note = i.auto_flag ? ' (may clog pores)' : '';
-        ingredientInfo += `<li>${i.inci_name} (${i.common_name}): ${i.explanation_short}${note}</li>`;
+        ingredientList += `
+          <li>
+            ${i.inci_name} – ${i.explanation_short}
+            ${i.base_score > 0 ? `<span class="flag">May clog pores</span>` : ""}
+          </li>
+        `;
       });
 
       resultsDiv.innerHTML = `
-        <h2>${productName}</h2>
-        <h3>Ingredients:</h3>
-        <ul>${ingredientInfo}</ul>
+        <h2>${product.name}</h2>
+        <h3>Ingredients</h3>
+        <ul>${ingredientList}</ul>
       `;
     }
 
-    // =========================
-    // Manual input button click
-    // =========================
-    checkButton.addEventListener("click", () => {
-      const inputText = ingredientInput.value;
-      analyzeIngredients(inputText, "Manual Entry");
-    });
+    // Manual lookup
+    document.getElementById("lookupBtn").onclick = () => {
+      const code = document.getElementById("barcodeInput").value.trim();
+      if (!code) return;
+      stopScanner();
+      handleBarcode(code);
+    };
 
-    // =========================
-    // Barcode scanning
-    // =========================
-    let scanInProgress = false;
-
-    window.codeReader.decodeFromVideoDevice(null, videoElement, async (result, err) => {
-      if (scanInProgress) return;
-      if (result) {
-        scanInProgress = true;
-        const barcode = result.text;
-        resultsDiv.innerHTML = `Scanning... Found barcode: ${barcode}`;
-
-        const { data: products, error } = await window.supabase
-          .from("products")
-          .select("*")
-          .eq("barcode", barcode)
-          .limit(1);
-
-        if (error) {
-          resultsDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
-          scanInProgress = false;
-          return;
-        }
-
-        if (!products || products.length === 0) {
-          resultsDiv.innerHTML = "No product found with this barcode.";
-          scanInProgress = false;
-          return;
-        }
-
-        const product = products[0];
-        const ingredientsRaw = product.inci_raw || "";
-        await analyzeIngredients(ingredientsRaw, product.name);
-
-        setTimeout(() => { scanInProgress = false; }, 3000);
-      }
-
-      if (err && !(err instanceof NotFoundException)) {
-        console.error(err);
-      }
-    });
+    // Start camera on load
+    startScanner();
   </script>
+
 </body>
 </html>
