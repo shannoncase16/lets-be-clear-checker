@@ -25,18 +25,23 @@
 <button id="analyzeText">Analyze Ingredients</button>
 
 <h2>Option 2: Scan Barcode</h2>
-<p>Allow camera access and point at barcode</p>
-<video id="camera" autoplay></video>
+<p>Allow camera access and hold steady over barcode</p>
+<video id="camera" autoplay playsinline></video>
+<br>
+<button onclick="location.reload()">Scan Another Product</button>
 
 <div id="results">No analysis yet.</div>
 
 <!-- Supabase -->
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-  window.supabase = createClient(
+
+  const supabase = createClient(
     "https://hmfjdsbfkgehybmeosxw.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtZmpkc2Jma2dlaHlibWVvc3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMjMyNzksImV4cCI6MjA4Mzc5OTI3OX0.fQyMIrURuqWYbvAJOYCQKbEu1fyUYZHiJtHmYGP_hO0"
   );
+
+  window.supabase = supabase;
 </script>
 
 <!-- ZXing -->
@@ -48,15 +53,29 @@
 <!-- App Logic -->
 <script type="module">
   const resultsDiv = document.getElementById("results");
+  const video = document.getElementById("camera");
 
   function normalize(str) {
     return str?.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
   }
 
+  function stopCamera(video) {
+    const stream = video.srcObject;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+  }
+
   async function analyzeIngredientList(ingredientArray) {
-    const { data: ingredients } = await window.supabase
+    const { data: ingredients, error } = await window.supabase
       .from("ingredients")
       .select("*");
+
+    if (error) {
+      resultsDiv.innerHTML = "Error loading ingredients.";
+      return;
+    }
 
     let totalScore = 0;
     let flaggedCount = 0;
@@ -76,13 +95,13 @@
     });
 
     let risk = "Low", cls = "low";
-    if (totalScore > 5) { risk = "High"; cls = "high"; }
-    else if (totalScore > 2) { risk = "Medium"; cls = "medium"; }
+    if (totalScore > 12) { risk = "High"; cls = "high"; }
+    else if (totalScore > 5) { risk = "Medium"; cls = "medium"; }
 
     resultsDiv.innerHTML = `
-      <p>Total comedogenic score: <strong>${totalScore}</strong>
+      <p><strong>Total comedogenic score:</strong> ${totalScore}
       <span class="${cls}">(${risk})</span></p>
-      <p>Flagged ingredients: <strong>${flaggedCount}</strong></p>
+      <p><strong>Flagged ingredients:</strong> ${flaggedCount}</p>
       <ul>${listHTML}</ul>
     `;
   }
@@ -94,15 +113,17 @@
     analyzeIngredientList(list);
   });
 
-  const video = document.getElementById("camera");
   let scanning = false;
 
   window.codeReader.decodeFromVideoDevice(null, video, async (result) => {
     if (!result || scanning) return;
-    scanning = true;
 
+    scanning = true;
     const barcode = result.text;
+
     resultsDiv.innerHTML = `Barcode detected: ${barcode}`;
+
+    stopCamera(video);
 
     const { data: products } = await window.supabase
       .from("products")
@@ -112,15 +133,12 @@
 
     if (!products || products.length === 0) {
       resultsDiv.innerHTML = "Product not found.";
-      scanning = false;
       return;
     }
 
     const product = products[0];
     const ingredients = product.inci_raw.split(",").map(i => i.trim());
     analyzeIngredientList(ingredients);
-
-    setTimeout(() => scanning = false, 3000);
   });
 </script>
 
